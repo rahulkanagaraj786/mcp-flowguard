@@ -1,0 +1,34 @@
+# Weak labels — lattice must still block illegal flows
+tool_labels:
+  filesystem: { confidentiality: INTERNAL, integrity: MEDIUM }
+  database: { confidentiality: INTERNAL, integrity: MEDIUM }
+  web_fetch: { confidentiality: PUBLIC, integrity: LOW }
+  email: { confidentiality: PUBLIC, integrity: LOW }
+
+rules:
+  - name: block-secret-exfil
+    source_tools: ["*"]
+    dest_tools: ["web_fetch", "email"]
+    min_confidentiality: SECRET
+    action: BLOCK
+
+  - name: allow-public-low-web
+    source_tools: ["*"]
+    dest_tools: ["web_fetch"]
+    max_confidentiality: PUBLIC
+    max_integrity: LOW
+    action: ALLOW
+
+  - name: allow-email
+    source_tools: ["*"]
+    dest_tools: ["email"]
+    max_confidentiality: PUBLIC
+    max_integrity: LOW
+    action: ALLOW
+
+  - name: allow-store
+    source_tools: ["*"]
+    dest_tools: ["filesystem", "database"]
+    max_confidentiality: INTERNAL
+    min_integrity: MEDIUM
+    action: ALLOW

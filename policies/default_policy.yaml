@@ -1,0 +1,53 @@
+# FlowGuard Policy Schema — default demo policy
+tool_labels:
+  filesystem: { confidentiality: CONFIDENTIAL, integrity: HIGH }
+  database: { confidentiality: CONFIDENTIAL, integrity: HIGH }
+  web_fetch: { confidentiality: PUBLIC, integrity: LOW }
+  email: { confidentiality: INTERNAL, integrity: MEDIUM }
+
+rules:
+  - name: block-confidential-plus-to-web
+    source_tools: ["*"]
+    dest_tools: ["web_fetch"]
+    min_confidentiality: CONFIDENTIAL
+    action: BLOCK
+
+  - name: block-secret-to-email
+    source_tools: ["*"]
+    dest_tools: ["email"]
+    min_confidentiality: SECRET
+    action: BLOCK
+
+  - name: warn-confidential-to-email
+    source_tools: ["*"]
+    dest_tools: ["email"]
+    min_confidentiality: CONFIDENTIAL
+    max_confidentiality: CONFIDENTIAL
+    action: WARN
+
+  - name: block-low-integrity-to-store
+    source_tools: ["*"]
+    dest_tools: ["filesystem", "database"]
+    max_integrity: LOW
+    action: BLOCK
+
+  - name: allow-public-low-to-web-fetch
+    source_tools: ["*"]
+    dest_tools: ["web_fetch"]
+    max_confidentiality: PUBLIC
+    max_integrity: LOW
+    action: ALLOW
+
+  - name: allow-to-email
+    source_tools: ["*"]
+    dest_tools: ["email"]
+    max_confidentiality: INTERNAL
+    min_integrity: MEDIUM
+    action: ALLOW
+
+  - name: allow-to-filesystem-database
+    source_tools: ["*"]
+    dest_tools: ["filesystem", "database"]
+    max_confidentiality: CONFIDENTIAL
+    min_integrity: HIGH
+    action: ALLOW
