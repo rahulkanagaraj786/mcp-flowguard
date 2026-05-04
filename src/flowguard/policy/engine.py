@@ -1,108 +1,72 @@
-"""Policy decision engine: lattice first, then rules, then default deny."""
-
-from __future__ import annotations
-
-from datetime import datetime, timezone
 from pathlib import Path
-
-from flowguard.lattice.labels import SecurityLabel
-from flowguard.lattice.lattice import SecurityLattice
+from flowguard.policy.types import FlowRequest, FlowDecision, Decision
 from flowguard.policy.dsl import PolicyRuleSet
-from flowguard.policy.exceptions import PolicyLoadError
 from flowguard.policy.loader import PolicyLoader
-from flowguard.policy.parsing import parse_confidentiality, parse_integrity
-from flowguard.policy.types import Decision, FlowDecision, FlowRequest, PolicyRule
+from flowguard.policy.types import PolicyRule
+from flowguard.lattice.lattice import SecurityLattice
+from flowguard.lattice.labels import SecurityLabel
+from flowguard.lattice.levels import ConfidentialityLevel, IntegrityLevel
 
 
 class PolicyEngine:
-    """Loads YAML policy and evaluates flows (MAC lattice + DAC rules)."""
+    """
+    The decision engine. Given a FlowRequest, returns a FlowDecision.
+    
+    Evaluation order:
+    1. Lattice check (BLP + Biba) — always applied, cannot be overridden
+    2. Explicit rules — most restrictive wins (BLOCK > WARN > ALLOW)
+    3. Default: ALLOW if lattice permits and no rule matches
+    """
 
-    _DEFAULT_DENY_REASON = (
-        "Lattice permitted flow, but no explicit policy rule allowed it (Default Deny)."
-    )
+    _PRECEDENCE = {Decision.BLOCK: 2, Decision.WARN: 1, Decision.ALLOW: 0}
 
     def __init__(self, policy_path: Path) -> None:
-        rules, raw_tools = PolicyLoader.load(policy_path)
-        self._rule_set = PolicyRuleSet(rules)
-        self._raw_tool_labels = raw_tools
-        self._tool_labels: dict[str, SecurityLabel] = {
-            name: SecurityLabel(
-                confidentiality=parse_confidentiality(spec["confidentiality"]),
-                integrity=parse_integrity(spec["integrity"]),
-            )
-            for name, spec in raw_tools.items()
-        }
-
-    def get_tool_label(self, tool_name: str) -> SecurityLabel:
-        if tool_name not in self._tool_labels:
-            raise PolicyLoadError(f"Unknown tool {tool_name!r} — not defined in policy tool_labels")
-        return self._tool_labels[tool_name]
+        rules, tool_labels_raw = PolicyLoader.load(policy_path)
+        self._ruleset = PolicyRuleSet(rules)
+        self._tool_labels = self._parse_tool_labels(tool_labels_raw)
 
     def evaluate(self, request: FlowRequest) -> FlowDecision:
-        now = datetime.now(timezone.utc)
-
+        # Step 1: Lattice check — hard block, no rule can override
         if not SecurityLattice.can_flow(request.source_label, request.dest_label):
-            reason = self._lattice_block_reason(request.source_label, request.dest_label)
             return FlowDecision(
                 decision=Decision.BLOCK,
                 request=request,
-                reason=reason,
-                matched_rule=None,
-                timestamp=now,
+                reason=(
+                    f"Lattice violation: {request.source_label} cannot flow to "
+                    f"{request.dest_label} (BLP/Biba)"
+                ),
             )
 
-        matched = self._rule_set.find_matching_rules(
-            request.source_tool,
-            request.dest_tool,
-            request.source_label,
+        # Step 2: Explicit rules
+        matching = self._ruleset.find_matching_rules(
+            request.source_tool, request.dest_tool, request.source_label
         )
-
-        if not matched:
+        if matching:
+            worst = max(matching, key=lambda r: self._PRECEDENCE[r.action])
             return FlowDecision(
-                decision=Decision.BLOCK,
+                decision=worst.action,
                 request=request,
-                reason=self._DEFAULT_DENY_REASON,
-                matched_rule=None,
-                timestamp=now,
+                reason=worst.description or f"Matched rule: {worst.name}",
+                matched_rule=worst.name,
             )
 
-        decision, winner = self._pick_winning_rule(matched)
-        reason = self._policy_reason(decision, winner)
-
+        # Step 3: Default allow
         return FlowDecision(
-            decision=decision,
+            decision=Decision.ALLOW,
             request=request,
-            reason=reason,
-            matched_rule=winner,
-            timestamp=now,
+            reason="No matching rule; lattice permits flow",
         )
 
-    @staticmethod
-    def _pick_winning_rule(matched: list[PolicyRule]) -> tuple[Decision, PolicyRule]:
-        """Prefer BLOCK > WARN > ALLOW; tie-break by specificity order (list already sorted)."""
-        for rule in matched:
-            if rule.action == Decision.BLOCK:
-                return Decision.BLOCK, rule
-        for rule in matched:
-            if rule.action == Decision.WARN:
-                return Decision.WARN, rule
-        return Decision.ALLOW, matched[0]
+    def get_tool_label(self, tool_name: str) -> SecurityLabel:
+        """Get the default security label for a tool's output."""
+        return self._tool_labels.get(tool_name, SecurityLattice.BOTTOM)
 
     @staticmethod
-    def _lattice_block_reason(src: SecurityLabel, dst: SecurityLabel) -> str:
-        parts = []
-        if src.confidentiality > dst.confidentiality:
-            parts.append(
-                "Lattice violation: source confidentiality exceeds destination clearance (BLP *-property / no write-down)."
+    def _parse_tool_labels(raw: dict) -> dict[str, SecurityLabel]:
+        result = {}
+        for tool, levels in raw.items():
+            result[tool] = SecurityLabel(
+                confidentiality=ConfidentialityLevel[levels["confidentiality"]],
+                integrity=IntegrityLevel[levels["integrity"]],
             )
-        if src.integrity < dst.integrity:
-            parts.append(
-                "Lattice violation: source integrity is below destination requirement (Biba *-property / no write-up)."
-            )
-        if not parts:
-            parts.append("Lattice violation: flow not permitted by security lattice.")
-        return " ".join(parts)
-
-    @staticmethod
-    def _policy_reason(decision: Decision, rule: PolicyRule) -> str:
-        return f"Policy rule '{rule.name}' matched (action: {decision})."
+        return result

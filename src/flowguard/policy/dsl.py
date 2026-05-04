@@ -1,17 +1,12 @@
-"""Match policy rules with specificity ordering."""
-
-from __future__ import annotations
-
+from flowguard.policy.types import PolicyRule, Decision
 from flowguard.lattice.labels import SecurityLabel
-from flowguard.policy.parsing import parse_confidentiality, parse_integrity
-from flowguard.policy.types import PolicyRule
+from flowguard.lattice.levels import ConfidentialityLevel, IntegrityLevel
 
 
 class PolicyRuleSet:
-    """Evaluate which rules apply to a flow, most-specific first."""
 
     def __init__(self, rules: list[PolicyRule]) -> None:
-        self._rules = list(rules)
+        self._rules = rules
 
     def find_matching_rules(
         self,
@@ -19,47 +14,33 @@ class PolicyRuleSet:
         dest_tool: str,
         source_label: SecurityLabel,
     ) -> list[PolicyRule]:
-        matched: list[PolicyRule] = []
+        """Return all rules that match this flow, ordered most-specific first."""
+        matched = []
         for rule in self._rules:
-            if not self._matches_tool(source_tool, rule.source_tools):
-                continue
-            if not self._matches_tool(dest_tool, rule.dest_tools):
-                continue
-            if not self._label_constraints_ok(rule, source_label):
-                continue
-            matched.append(rule)
-
-        matched.sort(key=self._specificity_score, reverse=True)
+            if (self._matches_tool(source_tool, rule.source_tools)
+                    and self._matches_tool(dest_tool, rule.dest_tools)
+                    and self._matches_label(rule, source_label)):
+                matched.append(rule)
+        # Most specific first: non-wildcard rules before wildcard rules
+        matched.sort(key=lambda r: ("*" in r.source_tools) + ("*" in r.dest_tools))
         return matched
 
     @staticmethod
-    def _matches_tool(tool_name: str, patterns: list[str]) -> bool:
-        if "*" in patterns:
-            return True
-        return tool_name in patterns
+    def _matches_tool(tool: str, patterns: list[str]) -> bool:
+        return "*" in patterns or tool in patterns
 
     @staticmethod
-    def _specificity_score(rule: PolicyRule) -> int:
-        src_wild = "*" in rule.source_tools
-        dst_wild = "*" in rule.dest_tools
-        return (0 if src_wild else 1) + (0 if dst_wild else 1)
-
-    @staticmethod
-    def _label_constraints_ok(rule: PolicyRule, source: SecurityLabel) -> bool:
-        if rule.min_confidentiality is not None:
-            thr = parse_confidentiality(rule.min_confidentiality)
-            if source.confidentiality < thr:
+    def _matches_label(rule: PolicyRule, label: SecurityLabel) -> bool:
+        if rule.min_confidentiality:
+            if label.confidentiality < ConfidentialityLevel[rule.min_confidentiality]:
                 return False
-        if rule.max_confidentiality is not None:
-            thr = parse_confidentiality(rule.max_confidentiality)
-            if source.confidentiality > thr:
+        if rule.max_confidentiality:
+            if label.confidentiality > ConfidentialityLevel[rule.max_confidentiality]:
                 return False
-        if rule.min_integrity is not None:
-            thr = parse_integrity(rule.min_integrity)
-            if source.integrity < thr:
+        if rule.min_integrity:
+            if label.integrity < IntegrityLevel[rule.min_integrity]:
                 return False
-        if rule.max_integrity is not None:
-            thr = parse_integrity(rule.max_integrity)
-            if source.integrity > thr:
+        if rule.max_integrity:
+            if label.integrity > IntegrityLevel[rule.max_integrity]:
                 return False
         return True

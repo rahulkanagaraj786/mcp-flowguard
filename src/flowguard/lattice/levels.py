@@ -1,16 +1,12 @@
-"""Confidentiality and integrity enumeration levels for the security lattice."""
+import enum
 
-from enum import IntEnum
-
-
-class ConfidentialityLevel(IntEnum):
+class ConfidentialityLevel(enum.IntEnum):
     PUBLIC = 0
     INTERNAL = 1
     CONFIDENTIAL = 2
     SECRET = 3
 
-
-class IntegrityLevel(IntEnum):
+class IntegrityLevel(enum.IntEnum):
     LOW = 0
     MEDIUM = 1
     HIGH = 2
