@@ -1,0 +1,16 @@
+version: "1.0"
+description: "Permissive policy — only blocks the most obvious violations"
+
+tool_labels:
+  filesystem:  { confidentiality: INTERNAL,  integrity: MEDIUM }
+  database:    { confidentiality: INTERNAL,   integrity: MEDIUM }
+  web_fetch:   { confidentiality: PUBLIC,     integrity: LOW    }
+  email:       { confidentiality: PUBLIC,     integrity: LOW    }
+
+rules:
+  - name: block_secret_only
+    description: "Only block SECRET data from leaving"
+    source_tools: ["*"]
+    dest_tools: ["web_fetch", "email"]
+    min_confidentiality: SECRET
+    action: BLOCK
