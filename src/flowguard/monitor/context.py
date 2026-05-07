@@ -13,7 +13,7 @@ class TaintedData:
     """
     content_hash: str
     label: SecurityLabel
-    soruce_tool: str
+    source_tool: str
     timestamp: datetime.datetime
     content_preview: streams
 
