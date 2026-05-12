@@ -17,7 +17,8 @@ def test_add_single_taint():
         content_preview="preview"
     )
     ctx.add_taint(data)
-    assert ctx.get_context_label() == SecurityLabel(ConfidentialityLevel.SECRET, IntegrityLevel.LOW)
+    # join of initial (PUBLIC, HIGH) and (SECRET, HIGH) = (SECRET, HIGH)
+    assert ctx.get_context_label() == SecurityLabel(ConfidentialityLevel.SECRET, IntegrityLevel.HIGH)
 
 def test_add_multiple_taint():
     ctx = SessionContext("session-2")
@@ -39,9 +40,10 @@ def test_clear_context():
     data = TaintedData("hash1", label, "tool1", datetime.datetime.utcnow(), "prev1")
     ctx.add_taint(data)
     
-    assert ctx.get_context_label() == SecurityLabel(ConfidentialityLevel.SECRET, IntegrityLevel.LOW)
+    # join of initial (PUBLIC, HIGH) and (SECRET, HIGH) = (SECRET, HIGH)
+    assert ctx.get_context_label() == SecurityLabel(ConfidentialityLevel.SECRET, IntegrityLevel.HIGH)
     ctx.clear()
-    assert ctx.get_context_label() == SecurityLattice.BOTTOM
+    assert ctx.get_context_label() == SecurityLabel(ConfidentialityLevel.PUBLIC, IntegrityLevel.HIGH)
     assert len(ctx.tainted_data) == 0
 
 def test_record_flow():
