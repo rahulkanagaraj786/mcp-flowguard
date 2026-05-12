@@ -1,7 +1,6 @@
 
 
-from asyncio import streams
-import datetime 
+import datetime
 from dataclasses import dataclass
 from flowguard.lattice.labels import SecurityLabel
 from flowguard.lattice.lattice import SecurityLattice
@@ -15,7 +14,7 @@ class TaintedData:
     label: SecurityLabel
     source_tool: str
     timestamp: datetime.datetime
-    content_preview: streams
+    content_preview: str
 
 class SessionContext: 
     def __init__(self, session_id: str): 
