@@ -24,6 +24,15 @@ class SecurityLattice:
         )
 
     @staticmethod
+    def all_labels() -> list[SecurityLabel]:
+        """Enumerate all 12 labels in the lattice (4 conf x 3 integ)."""
+        return [
+            SecurityLabel(c, i)
+            for c in ConfidentialityLevel
+            for i in IntegrityLevel
+        ]
+
+    @staticmethod
     def can_flow(source: SecurityLabel, dest: SecurityLabel) -> bool:
         """Bell-LaPadula + Biba combined flow check.
         BLP: source.conf <= dest.conf  (no write up / no read down for confidentiality)

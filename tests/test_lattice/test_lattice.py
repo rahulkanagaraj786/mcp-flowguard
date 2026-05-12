@@ -32,8 +32,8 @@ def test_bottom_can_flow_everywhere():
         # where conf >= PUBLIC and integ <= LOW — only (PUBLIC, LOW) itself
         pass  # implement exhaustive check
 
-def test_top_cannot_flow_anywhere_except_top():
+def test_top_cannot_flow_to_lower_confidentiality():
     top = SecurityLattice.TOP
     for label in SecurityLattice.all_labels():
-        if label != top:
+        if label.confidentiality < top.confidentiality:
             assert not SecurityLattice.can_flow(top, label)
