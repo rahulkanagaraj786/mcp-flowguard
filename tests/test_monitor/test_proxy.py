@@ -3,9 +3,6 @@ Integration tests for FlowGuardProxy.
 
 These tests wire all mock backends to the proxy via in-memory MCP transport
 and verify that the proxy correctly intercepts, blocks, and forwards tool calls.
-
-NOTE: These tests require Phase 1 (Policy Engine) and Phase 2A (Taint Engine)
-to be fully implemented. They will fail with ImportError until then.
 """
 
 import pytest
@@ -13,25 +10,16 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from mcp.shared.memory import create_connected_server_and_client_session
 
-# TODO: uncomment once Phase 1 and Phase 2A are complete
-# from flowguard.monitor.proxy import FlowGuardProxy
-# from flowguard.mock_tools.filesystem import create_filesystem_server
-# from flowguard.mock_tools.web_fetch import create_web_fetch_server
-# from flowguard.mock_tools.database import create_database_server
-# from flowguard.mock_tools.email import create_email_server
-
-pytestmark = pytest.mark.skip(reason="Requires Phase 1 and Phase 2A to be complete")
+from flowguard.monitor.proxy import FlowGuardProxy
+from flowguard.mock_tools.filesystem import create_filesystem_server
+from flowguard.mock_tools.web_fetch import create_web_fetch_server
+from flowguard.mock_tools.database import create_database_server
+from flowguard.mock_tools.email import create_email_server
 
 
 @asynccontextmanager
 async def build_proxy(policy_path: Path, enforcement_enabled: bool = True):
     """Helper: creates a fully wired proxy with all 4 mock backends."""
-    from flowguard.monitor.proxy import FlowGuardProxy
-    from flowguard.mock_tools.filesystem import create_filesystem_server
-    from flowguard.mock_tools.web_fetch import create_web_fetch_server
-    from flowguard.mock_tools.database import create_database_server
-    from flowguard.mock_tools.email import create_email_server
-
     proxy = FlowGuardProxy(
         policy_path=policy_path,
         session_id="test-session",

@@ -12,7 +12,8 @@ def test_on_tool_output():
     label1 = SecurityLabel(ConfidentialityLevel.PUBLIC, IntegrityLevel.HIGH)
     prop.on_tool_output("tool1", "content1", label1)
     
-    assert prop.get_flow_source_label() == SecurityLabel(ConfidentialityLevel.PUBLIC, IntegrityLevel.LOW)
+    # join of initial (PUBLIC, HIGH) and (PUBLIC, HIGH) = (PUBLIC, HIGH)
+    assert prop.get_flow_source_label() == SecurityLabel(ConfidentialityLevel.PUBLIC, IntegrityLevel.HIGH)
     
     label2 = SecurityLabel(ConfidentialityLevel.SECRET, IntegrityLevel.LOW)
     prop.on_tool_output("tool2", "content2", label2)
@@ -28,5 +29,5 @@ def test_reset():
     prop.on_tool_output("tool1", "content1", label1)
     
     prop.reset()
-    assert prop.get_flow_source_label() == SecurityLattice.BOTTOM
+    assert prop.get_flow_source_label() == SecurityLabel(ConfidentialityLevel.PUBLIC, IntegrityLevel.HIGH)
     assert len(ctx.tainted_data) == 0

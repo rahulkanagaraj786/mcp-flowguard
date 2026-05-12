@@ -37,7 +37,8 @@ def test_post_call_process_taints_context(interceptor):
     # Read from secret_tool, context should become SECRET
     label = interceptor.post_call_process("secret_tool", "secret data")
     assert label == SecurityLabel(ConfidentialityLevel.SECRET, IntegrityLevel.HIGH)
-    assert interceptor.propagator.get_flow_source_label() == SecurityLabel(ConfidentialityLevel.SECRET, IntegrityLevel.LOW)
+    # join of initial (PUBLIC, HIGH) and (SECRET, HIGH) = (SECRET, HIGH)
+    assert interceptor.propagator.get_flow_source_label() == SecurityLabel(ConfidentialityLevel.SECRET, IntegrityLevel.HIGH)
 
 def test_pre_call_check_blocked(interceptor):
     # Read secret data first
